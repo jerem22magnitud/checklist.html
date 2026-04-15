@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Segunda Fase — Villa 2</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --cream:#F5F0E8; --warm-white:#FAF8F4; --gold:#C9A84C; --gold-light:#E8D5A0;
+    --dark:#1C1A16; --charcoal:#2E2B26; --stone:#8A8070; --stone-light:#C4BAA8;
+    --rust:#A85C3C; --sage:#5A7A5C; --blue-gray:#4A5E72;
+    --mat-bg:#FFF8EE; --mat-border:#E8C97A; --mat-text:#7A5A1A;
+    --note-bg:#F0F4FF; --note-border:#A0B4D8; --note-text:#2A3E5A;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--cream);font-family:'DM Mono',monospace;color:var(--dark);min-height:100vh;}
+
+  /* ── SYNC BAR ── */
+  .sync-bar{background:#1C1A16;color:#8A8070;padding:10px 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:11px;letter-spacing:1px;}
+  .sync-left{display:flex;align-items:center;gap:12px;}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0;transition:background 0.4s;}
+  .sync-dot.ok{background:#5aba72;box-shadow:0 0 6px #5aba7266;}
+  .sync-dot.saving{background:#C9A84C;animation:pulse 0.8s infinite;}
+  .sync-dot.error{background:#A85C3C;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .sync-status{font-size:10px;letter-spacing:2px;color:#C4BAA8;}
+  .sync-time{font-size:10px;color:#8A8070;}
+  .btn-back{background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);color:#C9A84C;
+    padding:6px 14px;border-radius:3px;font-family:'DM Mono',monospace;font-size:10px;
+    letter-spacing:1px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn-back:hover{background:rgba(201,168,76,0.2);}
+
+  /* ── SETUP BANNER ── */
+  .setup-banner{background:#fff8e8;border-bottom:2px solid #E8C97A;padding:14px 40px;font-size:12px;color:#5a4010;line-height:1.6;display:none;}
+  .setup-banner.show{display:block;}
+  .setup-banner code{background:#f0e0a0;padding:1px 5px;border-radius:2px;font-size:11px;}
+  .setup-banner strong{color:#A85C3C;}
+
+  /* ── HEADER ── */
+  .header{background:var(--dark);color:var(--cream);padding:48px 40px 36px;position:relative;overflow:hidden;}
+  .header::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+    background:repeating-linear-gradient(-45deg,transparent,transparent 20px,rgba(201,168,76,0.04) 20px,rgba(201,168,76,0.04) 21px);}
+  .header-tag{font-size:10px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;margin-bottom:16px;position:relative;}
+  .header h1{font-family:'Playfair Display',serif;font-size:clamp(28px,5vw,52px);font-weight:900;line-height:1.1;position:relative;}
+  .header h1 span{color:var(--gold);font-style:italic;}
+  .header-sub{margin-top:16px;font-size:11px;letter-spacing:2px;color:var(--stone-light);position:relative;}
+  .header-meta{margin-top:28px;display:flex;gap:32px;flex-wrap:wrap;position:relative;}
+  .meta-item{border-left:2px solid var(--gold);padding-left:12px;}
+  .meta-label{font-size:9px;letter-spacing:3px;color:var(--stone);text-transform:uppercase;}
+  .meta-value{font-size:18px;font-weight:500;color:var(--cream);margin-top:2px;}
+
+  /* ── PROGRESS ── */
+  .progress-section{background:var(--charcoal);padding:20px 40px;display:flex;align-items:center;gap:20px;}
+  .progress-label{font-size:10px;letter-spacing:3px;color:var(--stone-light);text-transform:uppercase;white-space:nowrap;}
+  .progress-bar{flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:2px;transition:width 0.8s ease;}
+  .progress-pct{font-size:13px;color:var(--gold);min-width:40px;text-align:right;}
+
+  /* ── LEGEND ── */
+  .legend{display:flex;gap:20px;padding:12px 40px;background:var(--warm-white);border-bottom:1px solid var(--stone-light);flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:1px;color:var(--stone);}
+  .legend-dot{width:10px;height:10px;border-radius:2px;}
+  .ld-note{background:var(--note-bg);border:1px solid var(--note-border);}
+  .ld-mat{background:var(--mat-bg);border:1px solid var(--mat-border);}
+
+  .main{padding:32px 40px;max-width:1200px;margin:0 auto;}
+
+  /* ── ZONE ── */
+  .zone{margin-bottom:20px;border:1px solid var(--stone-light);background:var(--warm-white);animation:fadeUp 0.4s ease both;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  .zone:nth-child(1){animation-delay:.03s}.zone:nth-child(2){animation-delay:.06s}
+  .zone:nth-child(3){animation-delay:.09s}.zone:nth-child(4){animation-delay:.12s}
+  .zone:nth-child(5){animation-delay:.15s}.zone:nth-child(6){animation-delay:.18s}
+  .zone:nth-child(7){animation-delay:.21s}.zone:nth-child(8){animation-delay:.24s}
+  .zone:nth-child(9){animation-delay:.27s}.zone:nth-child(10){animation-delay:.30s}
+  .zone:nth-child(11){animation-delay:.33s}.zone:nth-child(12){animation-delay:.36s}
+  .zone:nth-child(13){animation-delay:.39s}.zone:nth-child(14){animation-delay:.42s}
+  .zone:nth-child(15){animation-delay:.45s}.zone:nth-child(16){animation-delay:.48s}
+  .zone:nth-child(17){animation-delay:.51s}.zone:nth-child(18){animation-delay:.54s}
+  .zone:nth-child(19){animation-delay:.57s}.zone:nth-child(20){animation-delay:.60s}
+  .zone:nth-child(21){animation-delay:.63s}
+
+  .zone-header{display:flex;align-items:center;gap:16px;padding:16px 24px;cursor:pointer;user-select:none;transition:background 0.2s;border-bottom:1px solid transparent;}
+  .zone-header:hover{background:rgba(201,168,76,0.06);}
+  .zone.open .zone-header{border-bottom-color:var(--stone-light);}
+  .zone-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;background:rgba(201,168,76,0.1);}
+  .zone-title-block{flex:1;}
+  .zone-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--dark);}
+  .zone-count{font-size:10px;letter-spacing:2px;color:var(--stone);margin-top:2px;}
+  .zone-badges{display:flex;gap:10px;align-items:center;}
+  .zone-done-count{font-size:11px;color:var(--stone);}
+  .zone-chevron{font-size:11px;color:var(--stone);transition:transform 0.3s;}
+  .zone.open .zone-chevron{transform:rotate(180deg);}
+  .zone-mini-bar{width:56px;height:3px;background:var(--stone-light);border-radius:2px;overflow:hidden;}
+  .zone-mini-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.5s;}
+
+  .zone-tasks{display:none;}
+  .zone.open .zone-tasks{display:block;}
+  .sub-group{border-bottom:1px solid rgba(196,186,168,0.35);}
+  .sub-group:last-child{border-bottom:none;}
+  .sub-header{display:flex;align-items:center;gap:12px;padding:11px 24px 11px 20px;cursor:pointer;user-select:none;background:rgba(196,186,168,0.08);transition:background 0.2s;}
+  .sub-header:hover{background:rgba(201,168,76,0.05);}
+  .sub-bullet{width:8px;height:8px;background:var(--gold);border-radius:50%;flex-shrink:0;}
+  .sub-name{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--charcoal);font-weight:500;flex:1;}
+  .sub-count{font-size:10px;color:var(--stone);}
+  .sub-chevron{font-size:10px;color:var(--stone);transition:transform 0.25s;}
+  .sub-group.open .sub-chevron{transform:rotate(180deg);}
+  .sub-tasks{display:none;}
+  .sub-group.open .sub-tasks{display:block;}
+
+  /* ── TASK ROW ── */
+  .task-row{border-bottom:1px solid rgba(196,186,168,0.2);}
+  .task-row:last-child{border-bottom:none;}
+  .task-main{display:flex;align-items:center;gap:12px;padding:9px 16px 9px 44px;transition:background 0.15s;}
+  .task-main:hover{background:rgba(201,168,76,0.05);}
+  .task-check{width:16px;height:16px;border:1.5px solid var(--stone-light);border-radius:2px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.2s;cursor:pointer;}
+  .task-row.done .task-check{background:var(--sage);border-color:var(--sage);}
+  .task-row.done .task-check::after{content:'✓';font-size:10px;color:white;}
+  .task-text{font-size:13px;color:var(--charcoal);flex:1;cursor:pointer;}
+  .task-row.done .task-text{text-decoration:line-through;color:var(--stone);}
+  .task-actions{display:flex;gap:6px;flex-shrink:0;}
+  .btn-action{border:none;background:none;cursor:pointer;padding:4px 8px;border-radius:3px;font-size:10px;letter-spacing:0.5px;font-family:'DM Mono',monospace;transition:all 0.15s;display:flex;align-items:center;gap:4px;}
+  .btn-note{color:var(--note-text);background:var(--note-bg);border:1px solid var(--note-border);}
+  .btn-note:hover{background:#dde6f8;}.btn-note.active{background:#c8d8f0;border-color:#7090c0;}
+  .btn-mat{color:var(--mat-text);background:var(--mat-bg);border:1px solid var(--mat-border);}
+  .btn-mat:hover{background:#f0e4c0;}.btn-mat.active{background:#e8d090;border-color:#c09030;}
+  .task-panels{display:none;padding:0 16px 10px 44px;gap:10px;flex-direction:column;}
+  .task-panels.open{display:flex;}
+  .panel-note{background:var(--note-bg);border:1px solid var(--note-border);border-radius:4px;padding:10px 12px;}
+  .panel-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:500;}
+  .panel-note .panel-label{color:var(--note-text);}.panel-mat .panel-label{color:var(--mat-text);}
+  .note-input{width:100%;background:transparent;border:none;outline:none;font-family:'DM Mono',monospace;font-size:12px;color:var(--note-text);resize:none;min-height:52px;line-height:1.5;}
+  .note-input::placeholder{color:#a0b4d0;font-style:italic;}
+  .panel-mat{background:var(--mat-bg);border:1px solid var(--mat-border);border-radius:4px;padding:10px 12px;}
+  .mat-list{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+  .mat-item{display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--mat-border);border-radius:3px;padding:5px 8px;}
+  .mat-item-text{font-size:12px;color:var(--mat-text);flex:1;}
+  .mat-delete{background:none;border:none;cursor:pointer;color:#c09030;font-size:13px;padding:0 2px;opacity:0.6;transition:opacity 0.15s;}
+  .mat-delete:hover{opacity:1;}
+  .mat-add-row{display:flex;gap:6px;}
+  .mat-input{flex:1;background:white;border:1px solid var(--mat-border);border-radius:3px;padding:5px 8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--mat-text);outline:none;}
+  .mat-input::placeholder{color:#c8a860;font-style:italic;font-size:11px;}
+  .mat-input:focus{border-color:#c09030;}
+  .mat-add-btn{background:var(--mat-text);color:white;border:none;border-radius:3px;padding:5px 10px;cursor:pointer;font-size:13px;font-weight:bold;}
+  .has-note-dot,.has-mat-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:none;}
+  .has-note-dot{background:var(--note-border);}.has-mat-dot{background:var(--mat-border);}
+  .has-note .has-note-dot,.has-mat .has-mat-dot{display:inline-block;}
+
+  .footer{text-align:center;padding:40px;font-size:10px;letter-spacing:3px;color:var(--stone);border-top:1px solid var(--stone-light);text-transform:uppercase;}
+  @media(max-width:640px){
+    .main{padding:16px}.header{padding:28px 20px 24px}
+    .progress-section,.sync-bar{padding:14px 20px}.legend{padding:10px 16px}
+    .zone-header{padding:12px 16px}.task-main{padding-left:28px}
+    .task-panels{padding-left:28px}.task-actions .btn-action span{display:none}
+    .setup-banner{padding:12px 16px}
+  }
+  @media print{.zone-tasks,.sub-tasks,.task-panels{display:block!important}
+    .task-panels{display:flex!important}.zone-chevron,.sub-chevron,.btn-action,.sync-bar{display:none}body{background:white}}
+</style>
+</head>
+<body>
+
+<!-- ── SYNC BAR ── -->
+<div class="sync-bar">
+  <div class="sync-left">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span class="sync-status" id="sync-status">Connexion…</span>
+    <span class="sync-time" id="sync-time"></span>
+  </div>
+  <a class="btn-back" href="./index.html">← Accueil</a>
+</div>
+
+<!-- ── SETUP BANNER ── -->
+<div class="setup-banner" id="setup-banner">
+  ⚙️ <strong>Configuration Supabase requise.</strong>
+  Remplace <code>SUPABASE_URL</code> et <code>SUPABASE_ANON_KEY</code> dans le code par tes vraies valeurs.
+  → <strong>supabase.com</strong> → ton projet → Settings → API
+</div>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <div class="header-tag">— Chantier · Segunda Fase —</div>
+  <h1>Villa <span>2</span></h1>
+  <div class="header-sub">Lista de tareas · Segunda fase & Acabados</div>
+  <div class="header-meta">
+    <div class="meta-item"><div class="meta-label">Zonas</div><div class="meta-value" id="zone-count-display">—</div></div>
+    <div class="meta-item"><div class="meta-label">Tareas totales</div><div class="meta-value" id="total-count">—</div></div>
+    <div class="meta-item"><div class="meta-label">Avance</div><div class="meta-value" id="pct-display">0%</div></div>
+  </div>
+</div>
+
+<div class="progress-section">
+  <div class="progress-label">Progreso global</div>
+  <div class="progress-bar"><div class="progress-fill" id="global-bar"></div></div>
+  <div class="progress-pct" id="global-pct">0%</div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot ld-note"></div>Comentario / nota</div>
+  <div class="legend-item"><div class="legend-dot ld-mat"></div>Materiales faltantes</div>
+</div>
+
+<div class="main" id="zones-container"></div>
+<div class="footer">Villa 2 · Segunda Fase · Checklist de obra · ☁️ Supabase</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// ⚙️  CONFIGURATION SUPABASE — À remplacer
+// ══════════════════════════════════════════════════════════
+const SUPABASE_URL      = 'https://vhitrsihrkzqkwjyexvi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoaXRyc2locmt6cWt3anlleHZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNDYwMzEsImV4cCI6MjA5MTgyMjAzMX0.1IoNel23H3UXVjYkcJJHloAYlo0T-FzmS7rfzYLvbhs';
+const PROJECT_ID        = 'villa2';             // identifiant unique du projet
+
+// ══════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════
+const G = {
+  electricidad:{ label:"Electricidad", tasks:[
+    "Câbles de luz","Cables enchufes","Cables bus","Cable interruptor",
+    "Caja de distribución","Persiana","Alimentación calefacción","Cajitas Pladur",
+    "Mecanismos","Instal led","Instal RJ45","Instal luz",
+    "Instal enchufes","Instal domótica","Instalación focos"]},
+  fontaneria:{ label:"Fontanería", tasks:[
+    "Alimentación agua caliente","Alimentación agua fría","Desagüe lavabo",
+    "Desagüe ducha","Coloc empotrado WC","Coloc empotrado lavabo",
+    "Coloc empotrado ducha","Impermeabilizante ducha","Connexion llaves de corte"]},
+  clima:{ label:"Climatización / Ventilación", tasks:[
+    "Instalación unidades interior","Connexion unidades","Conductos en techos",
+    "Instal plènum","Colocación rejillas","Instalación tubos ventilación",
+    "Rejillas ventilación","Connexion ventilación"]},
+  pladur:{ label:"Pladur", tasks:[
+    "Trasdosados","Tabiques","Techo","Candilejas","Juntas enlucido","Trampillas"]},
+  pintura:{ label:"Pintura", tasks:[
+    "Enlucido de muro","Lijado de paredes","Lijado de techo","Pintura 1ª capa","Pintura 2ª capa"]},
+  carpinteria:{ label:"Carpintería", tasks:[
+    "Pre marco en puerta","Puertas","Ropero 1","Ropero 2","Panelado muro","Panelado techo"]},
+  marmoles:{ label:"Mármoles Baños", tasks:[
+    "Muro","Suelo","Nichos","Plato de ducha","Juntas","Limpieza"]},
+  parquetista:{ label:"Parquetista", tasks:[
+    "Colocación espuma aislante","Colocación parquet","Colocación rodapié","Limpieza","Colocación protección"]},
+  carpExt:{ label:"Carpintería Exterior", tasks:[
+    "Colocación ventana","Colocación BSO","Colocación persiana","Protección","Recepción final"]},
+  fachada:{ label:"Fachada", tasks:[
+    "Colocación andamio","Colocación estructura","Colocación lana",
+    "Colocación acabado","Colocación acabado aluminio","Desmontaje andamio"]},
+  piedraFachada:{ label:"Piedra Fachada", tasks:[
+    "Colocación espuma","Colocación cola con reja","Fijación Spit estrellas",
+    "Colocación piedra","Limpieza Kärcher"]},
+  cocina:{ label:"Cocina", tasks:[
+    "Instalación muebles","Electricidad cocina","Colocación electrodomésticos","Limpieza"]},
+  chimenea:{ label:"Chimenea", tasks:[
+    "Instalación conductos","Instalación chimenea","Acabado chimenea","Recepción"]},
+  ascensor:{ label:"Ascensor", tasks:[
+    "Instalación técnica","Alimentación eléctrica","Impermeabilización","Colocación ascensor","Recepción"]},
+  barandillas:{ label:"Barandillas", tasks:[
+    "Instalación perfilería","Instalación cristal","Instalación barandilla metálica","Acabado aluminio"]},
+  piscina:{ label:"Piscina", tasks:[
+    "Instalación maquinaria","Instalación eléctrica","Impermeabilización",
+    "Coloc piedra","Instalación luz","Test y recepción"]},
+  terraza:{ label:"Terraza / Balcón", tasks:[
+    "Colocación madera","Colocación baldosas","Impermeabilización",
+    "Impermeabilización balcón","Madera balcón","Colocación acabado aluminio"]},
+  poolhouse:{ label:"Pool House", tasks:[
+    "Instalación ducha","Instalación baño","Instalación cocina","Instalación puerta",
+    "Instalación Pladur","Instalación electricidad","Instalación fontanería",
+    "Instalación luz","Impermeabilización techo","Acabado madera fachada","Acabado canto aluminio"]},
+  exteriores:{ label:"Exteriores", tasks:[
+    "Adoquín Villa 1","Adoquín Villa 2","Muros de piedras","Escaleras entrada",
+    "Escaleras jardín","Pilares entrada principal","Colocación de puertas",
+    "Riegos Villa 2","Riegos Villa 1","Puntos de luz","Puntos de agua"]},
+};
+const I  = [G.electricidad,G.fontaneria,G.clima,G.pladur,G.pintura,G.carpinteria,G.marmoles,G.parquetista,G.carpExt];
+const IS = [G.electricidad,G.clima,G.pladur,G.pintura,G.carpinteria,G.parquetista,G.carpExt];
+const zones = [
+  {id:"salon",      icon:"🛋️",name:"Salon",           groups:I},
+  {id:"comedor",    icon:"🍽️",name:"Comedor",          groups:I},
+  {id:"cocina",     icon:"🍳",name:"Cocina",           groups:[...I,G.cocina]},
+  {id:"oficina",    icon:"📐",name:"Oficina",          groups:IS},
+  {id:"hab1",       icon:"🛏️",name:"Habitación 1",     groups:I},
+  {id:"hab2",       icon:"🛏️",name:"Habitación 2",     groups:I},
+  {id:"hab3",       icon:"🛏️",name:"Habitación 3",     groups:I},
+  {id:"hab4",       icon:"🛏️",name:"Habitación 4",     groups:I},
+  {id:"master",     icon:"👑",name:"Máster",           groups:[...I,G.chimenea]},
+  {id:"garage",     icon:"🚗",name:"Garage",           groups:[G.electricidad,G.clima,G.pladur,G.pintura]},
+  {id:"fitness",    icon:"🏋️",name:"Fitness",          groups:[G.electricidad,G.fontaneria,G.clima,G.pladur,G.pintura,G.marmoles]},
+  {id:"spa",        icon:"💆",name:"Spa",              groups:I},
+  {id:"cinema",     icon:"🎬",name:"Cinema",           groups:[G.electricidad,G.clima,G.pladur,G.pintura,G.carpinteria]},
+  {id:"lavanderia", icon:"🧺",name:"Lavandería",       groups:[G.electricidad,G.fontaneria,G.pladur,G.pintura]},
+  {id:"fachada",    icon:"🧱",name:"Fachada",          groups:[G.fachada,G.piedraFachada,G.carpExt]},
+  {id:"barandillas",icon:"🪜",name:"Barandillas",      groups:[G.barandillas]},
+  {id:"ascensor",   icon:"🛗",name:"Ascensor",         groups:[G.ascensor]},
+  {id:"piscina",    icon:"🏊",name:"Piscina",          groups:[G.piscina,G.electricidad]},
+  {id:"terraza",    icon:"🌿",name:"Terraza / Balcón", groups:[G.terraza,G.electricidad]},
+  {id:"poolhouse",  icon:"🏡",name:"Pool House",       groups:[G.poolhouse,G.electricidad,G.fontaneria]},
+  {id:"exteriores", icon:"🛤️",name:"Exteriores",       groups:[G.exteriores,G.electricidad]},
+];
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+const doneTasks = new Set();
+const notes     = {};
+const materials = {};
+let totalTasks  = 0;
+let saveTimer   = null;
+let db          = null;
+
+// ══════════════════════════════════════════════════════════
+// SUPABASE INIT
+// ══════════════════════════════════════════════════════════
+const syncDot    = document.getElementById('sync-dot');
+const syncStatus = document.getElementById('sync-status');
+const syncTime   = document.getElementById('sync-time');
+
+function setSyncState(state, msg, time){
+  syncDot.className = 'sync-dot'+(state==='ok'?' ok':state==='saving'?' saving':state==='error'?' error':'');
+  syncStatus.textContent = msg;
+  syncTime.textContent   = time||'';
+}
+
+const isConfigured = SUPABASE_URL !== 'SUPABASE_URL' && SUPABASE_ANON_KEY !== 'SUPABASE_ANON_KEY';
+
+if(!isConfigured){
+  document.getElementById('setup-banner').classList.add('show');
+  setSyncState('error','⚠️ Supabase non configuré — données non sauvegardées');
+} else {
+  try {
+    db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    setSyncState('saving','Connexion à Supabase…');
+    loadFromSupabase();
+  } catch(e){
+    setSyncState('error','Erreur de connexion');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// SUPABASE OPS
+// ══════════════════════════════════════════════════════════
+async function loadFromSupabase(){
+  try {
+    const {data,error} = await db.from('checklist_data').select('*').eq('project_id',PROJECT_ID).single();
+    if(error && error.code !== 'PGRST116'){ throw error; }
+    if(data && data.payload){ applyData(data.payload); }
+    const t = new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+    setSyncState('ok','☁️ Connecté', '· '+t);
+  } catch(e){
+    setSyncState('error','Erreur de chargement');
+    console.error(e);
+  }
+}
+
+async function saveToSupabase(){
+  if(!db) return;
+  setSyncState('saving','Sauvegarde…');
+  const payload = { done:[...doneTasks], notes, materials, savedAt:new Date().toISOString() };
+  try {
+    const {error} = await db.from('checklist_data').upsert(
+      {project_id:PROJECT_ID, payload},
+      {onConflict:'project_id'}
+    );
+    if(error) throw error;
+    const t = new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+    setSyncState('ok','☁️ Sauvegardé','· '+t);
+  } catch(e){
+    setSyncState('error','Erreur de sauvegarde');
+    console.error(e);
+  }
+}
+
+function scheduleSave(){
+  if(!db) return;
+  clearTimeout(saveTimer);
+  setSyncState('saving','En cours…');
+  saveTimer = setTimeout(saveToSupabase, 1500);
+}
+
+function applyData(data){
+  if(!data) return;
+  if(data.done) data.done.forEach(k=>{
+    doneTasks.add(k);
+    const row = document.getElementById('row-'+k);
+    if(row){ row.classList.add('done'); }
+  });
+  if(data.notes) Object.entries(data.notes).forEach(([k,v])=>{
+    notes[k]=v;
+    const ta=document.getElementById('note-'+k);
+    if(ta) ta.value=v;
+    const row=document.getElementById('row-'+k);
+    if(row&&v.trim()) row.classList.add('has-note');
+  });
+  if(data.materials) Object.entries(data.materials).forEach(([k,v])=>{
+    materials[k]=v;
+    const row=document.getElementById('row-'+k);
+    if(row&&v.length) row.classList.add('has-mat');
+  });
+  refreshAllProgress();
+}
+
+function refreshAllProgress(){
+  zones.forEach((_,zi)=>{
+    const zoneTasks = document.querySelectorAll(`[id^="row-${zi}-"]`);
+    const zDone = [...zoneTasks].filter(r=>doneTasks.has(r.id.replace('row-',''))).length;
+    const zTotal = zoneTasks.length;
+    const bar=document.querySelector(`[data-zone-bar="${zi}"]`);
+    const cnt=document.querySelector(`[data-zone-done="${zi}"]`);
+    if(bar) bar.style.width=(zTotal?Math.round(zDone/zTotal*100):0)+'%';
+    if(cnt) cnt.textContent=`${zDone}/${zTotal}`;
+    zones[zi].groups.forEach((_,gi)=>{
+      const gt=document.querySelectorAll(`[id^="row-${zi}-${gi}-"]`);
+      const gd=[...gt].filter(r=>doneTasks.has(r.id.replace('row-',''))).length;
+      const gEl=document.querySelector(`[data-group-done="${zi}-${gi}"]`);
+      if(gEl) gEl.textContent=`${gd}/${gt.length}`;
+    });
+  });
+  const done=doneTasks.size;
+  const pct=totalTasks?Math.round(done/totalTasks*100):0;
+  document.getElementById('global-bar').style.width=pct+'%';
+  document.getElementById('global-pct').textContent=pct+'%';
+  document.getElementById('pct-display').textContent=pct+'%';
+}
+
+// ══════════════════════════════════════════════════════════
+// BUILD UI
+// ══════════════════════════════════════════════════════════
+const container = document.getElementById('zones-container');
+document.getElementById('zone-count-display').textContent = zones.length+' zonas';
+
+zones.forEach((zone,zi)=>{
+  const taskCount = zone.groups.reduce((a,g)=>a+g.tasks.length,0);
+  totalTasks += taskCount;
+  const el = document.createElement('div');
+  el.className='zone'; el.dataset.zoneIdx=zi;
+
+  let groupsHTML = zone.groups.map((g,gi)=>{
+    const tasksHTML = g.tasks.map((t,ti)=>{
+      const key=`${zi}-${gi}-${ti}`;
+      return `
+      <div class="task-row" id="row-${key}">
+        <div class="task-main">
+          <div class="task-check" onclick="toggleTask('${key}')"></div>
+          <div class="task-text" onclick="toggleTask('${key}')">${t}</div>
+          <div class="has-note-dot"></div>
+          <div class="has-mat-dot"></div>
+          <div class="task-actions">
+            <button class="btn-action btn-note" id="btn-note-${key}" onclick="togglePanel('${key}','note')">📝 <span>Nota</span></button>
+            <button class="btn-action btn-mat"  id="btn-mat-${key}"  onclick="togglePanel('${key}','mat')">🧱 <span>Materiales</span></button>
+          </div>
+        </div>
+        <div class="task-panels" id="panels-${key}">
+          <div class="panel-note" id="panel-note-${key}" style="display:none">
+            <div class="panel-label">📝 Comentario / Nota</div>
+            <textarea class="note-input" id="note-${key}" placeholder="Añadir un comentario…" oninput="saveNote('${key}',this.value)" rows="2"></textarea>
+          </div>
+          <div class="panel-mat" id="panel-mat-${key}" style="display:none">
+            <div class="panel-label">🧱 Materiales faltantes</div>
+            <div class="mat-list" id="matlist-${key}"></div>
+            <div class="mat-add-row">
+              <input class="mat-input" id="matinput-${key}" placeholder="Añadir material faltante…" onkeydown="matKeydown(event,'${key}')">
+              <button class="mat-add-btn" onclick="addMaterial('${key}')">+</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="sub-group" data-group="${zi}-${gi}">
+      <div class="sub-header" onclick="toggleGroup(this)">
+        <div class="sub-bullet"></div>
+        <div class="sub-name">${g.label}</div>
+        <div class="sub-count" data-group-done="${zi}-${gi}">0/${g.tasks.length}</div>
+        <div class="sub-chevron">▼</div>
+      </div>
+      <div class="sub-tasks">${tasksHTML}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="zone-header" onclick="toggleZone(this)">
+      <div class="zone-icon">${zone.icon}</div>
+      <div class="zone-title-block">
+        <div class="zone-name">${zone.name}</div>
+        <div class="zone-count">${taskCount} tareas · ${zone.groups.length} secciones</div>
+      </div>
+      <div class="zone-badges">
+        <div class="zone-mini-bar"><div class="zone-mini-fill" data-zone-bar="${zi}" style="width:0%"></div></div>
+        <div class="zone-done-count" data-zone-done="${zi}">0/${taskCount}</div>
+        <div class="zone-chevron">▼</div>
+      </div>
+    </div>
+    <div class="zone-tasks">${groupsHTML}</div>`;
+  container.appendChild(el);
+});
+
+document.getElementById('total-count').textContent=totalTasks+' tareas';
+
+// ══════════════════════════════════════════════════════════
+// INTERACTIONS
+// ══════════════════════════════════════════════════════════
+function toggleZone(h){ h.parentElement.classList.toggle('open'); }
+function toggleGroup(h){ h.parentElement.classList.toggle('open'); }
+
+function toggleTask(key){
+  const row=document.getElementById('row-'+key);
+  doneTasks.has(key)?doneTasks.delete(key):doneTasks.add(key);
+  row.classList.toggle('done');
+  updateProgress(key);
+  scheduleSave();
+}
+
+function togglePanel(key,type){
+  const panels=document.getElementById('panels-'+key);
+  const noteEl=document.getElementById('panel-note-'+key);
+  const matEl =document.getElementById('panel-mat-'+key);
+  const btnNote=document.getElementById('btn-note-'+key);
+  const btnMat =document.getElementById('btn-mat-'+key);
+  if(type==='note'){
+    const open=noteEl.style.display!=='none';
+    noteEl.style.display=open?'none':'block';
+    btnNote.classList.toggle('active',!open);
+  } else {
+    const open=matEl.style.display!=='none';
+    matEl.style.display=open?'none':'block';
+    btnMat.classList.toggle('active',!open);
+    if(!open) renderMaterials(key);
+  }
+  panels.classList.toggle('open',noteEl.style.display!=='none'||matEl.style.display!=='none');
+}
+
+function saveNote(key,val){
+  notes[key]=val;
+  document.getElementById('row-'+key).classList.toggle('has-note',val.trim().length>0);
+  scheduleSave();
+}
+
+function renderMaterials(key){
+  const list=document.getElementById('matlist-'+key);
+  if(!list) return;
+  const items=materials[key]||[];
+  list.innerHTML=items.map((m,i)=>`
+    <div class="mat-item">
+      <span class="mat-item-text">• ${m}</span>
+      <button class="mat-delete" onclick="deleteMaterial('${key}',${i})">✕</button>
+    </div>`).join('');
+  document.getElementById('row-'+key).classList.toggle('has-mat',items.length>0);
+}
+
+function addMaterial(key){
+  const inp=document.getElementById('matinput-'+key);
+  const val=inp.value.trim();
+  if(!val) return;
+  if(!materials[key]) materials[key]=[];
+  materials[key].push(val);
+  inp.value='';
+  renderMaterials(key);
+  scheduleSave();
+}
+
+function deleteMaterial(key,idx){
+  materials[key].splice(idx,1);
+  renderMaterials(key);
+  scheduleSave();
+}
+
+function matKeydown(e,key){ if(e.key==='Enter'){e.preventDefault();addMaterial(key);} }
+
+function updateProgress(key){
+  const [zi,gi]=key.split('-').map(Number);
+  const zoneTasks=document.querySelectorAll(`[id^="row-${zi}-"]`);
+  const zDone=[...zoneTasks].filter(r=>doneTasks.has(r.id.replace('row-',''))).length;
+  const zTotal=zoneTasks.length;
+  document.querySelector(`[data-zone-bar="${zi}"]`).style.width=(zTotal?Math.round(zDone/zTotal*100):0)+'%';
+  document.querySelector(`[data-zone-done="${zi}"]`).textContent=`${zDone}/${zTotal}`;
+  const gt=document.querySelectorAll(`[id^="row-${zi}-${gi}-"]`);
+  const gd=[...gt].filter(r=>doneTasks.has(r.id.replace('row-',''))).length;
+  const gEl=document.querySelector(`[data-group-done="${zi}-${gi}"]`);
+  if(gEl) gEl.textContent=`${gd}/${gt.length}`;
+  const pct=totalTasks?Math.round(doneTasks.size/totalTasks*100):0;
+  document.getElementById('global-bar').style.width=pct+'%';
+  document.getElementById('global-pct').textContent=pct+'%';
+  document.getElementById('pct-display').textContent=pct+'%';
+}
+</script>
+</body>
+</html>
